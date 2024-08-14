@@ -1,0 +1,3 @@
+black==24.8.0
+docformatter==1.7.5
+isort==5.13.2
