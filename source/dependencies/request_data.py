@@ -1,32 +1,59 @@
 import re
+from typing import Callable
 
 
 class RequestData:
-    def __init__(self, scope, receive, path_regex, path):
-        self._scope = scope
-        self._receive = receive
-        self._path_regex = path_regex
-        self._path = path
+    def __init__(self, scope: dict, receive: Callable, path_regex: str, path: str):
+        self._scope: dict = scope
+        self._receive: Callable = receive
+        self._path_regex: str = path_regex
+        self._path: str = path
 
-        self._query_params: dict = dict()
+        self._path_parameters: dict = dict()
+        self._query_parameters: dict = dict()
 
-    def __call__(self):
-        self._set_query_params()
+    async def __call__(self) -> "RequestData":
+        await self._set_path_parameters()
+        await self._set_query_parameters()
 
         return self
 
-    def _parse_url(self):
-        match = re.match(self._path_regex, self._path)
+    async def _parse_url(self) -> dict[str:str] | None:
+        match: dict[str:str] = re.match(self._path_regex, self._path)
 
         if match:
             return match.groupdict()
         return None
 
-    def _extract_query_params(self):
-        return self._parse_url()
+    async def _extract_query_string_data(self) -> dict[str:str]:
+        query_string: bytes = self._scope.get("query_string")
 
-    def _set_query_params(self):
-        self._query_params = self._extract_query_params()
+        queries_list: list[str] = query_string.decode("utf-8").split("&")
 
-    def query_params(self):
-        return self._query_params
+        data: dict[str:str] = dict()
+
+        for query in queries_list:
+            equal_index: int = query.find("=")
+
+            name: str = query[:equal_index:]
+            value: str = query[equal_index + 1 : :]
+
+            if name != "" and value != "":
+                data[name] = value
+
+        return data
+
+    async def _extract_path_parameters(self) -> dict[str:str] | None:
+        return await self._parse_url()
+
+    async def _set_query_parameters(self) -> None:
+        self._query_parameters = await self._extract_query_string_data()
+
+    async def _set_path_parameters(self) -> None:
+        self._path_parameters = await self._extract_path_parameters()
+
+    def path_parameters(self) -> dict[str:str]:
+        return self._path_parameters
+
+    def query_parameters(self) -> dict[str:str]:
+        return self._query_parameters
