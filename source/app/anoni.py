@@ -42,9 +42,7 @@ class Anoni:
                     )()
 
                     response_data = await self._process_response(
-                        request_data=request_data,
-                        method=method,
-                        handler=handler
+                        request_data=request_data, method=method, handler=handler
                     )
 
                     await self.send_response(send, response_data)
@@ -55,9 +53,7 @@ class Anoni:
             if not called:
                 page_not_fund = NotFound404()
 
-                response_data = ResponseData(
-                    scheme=page_not_fund
-                )
+                response_data = ResponseData(scheme=page_not_fund)
 
                 await self.send_response(send, response_data)
 
@@ -65,9 +61,7 @@ class Anoni:
         request_data = await self._process_before_middlewares(request_data)
 
         if method in ("GET", "DELETE"):
-            response_data: ResponseData = await handler(
-                request_data=request_data
-            )
+            response_data: ResponseData = await handler(request_data=request_data)
         elif method in ("POST", "PUT", "PATCH"):
             body: dict = await self._get_body(request_data.receive())
             filled_scheme: BaseModel = await fill_scheme(handler, body)
@@ -75,7 +69,9 @@ class Anoni:
                 scheme=filled_scheme, request_data=request_data
             )
 
-        response_data = await self._process_after_middlewares(response_data=response_data)
+        response_data = await self._process_after_middlewares(
+            response_data=response_data
+        )
 
         return response_data
 
@@ -97,9 +93,7 @@ class Anoni:
 
         return body_data
 
-    async def send_response(
-            self, send: Callable, response_data: ResponseData
-    ) -> None:
+    async def send_response(self, send: Callable, response_data: ResponseData) -> None:
         response = response_data.response()
 
         status: int = response.status
@@ -139,18 +133,16 @@ class Anoni:
     async def register_middleware(self, call: str, middleware) -> None:
         call: str = call.lower()
 
-        if call not in ('before', 'after'):
-            raise ValueError(
-                "Call parameter have to be 'after' or 'before' only"
-            )
+        if call not in ("before", "after"):
+            raise ValueError("Call parameter have to be 'after' or 'before' only")
         # elif issubclass(middleware, AbstractMiddleware):
         #     raise ValueError(
         #         "Middleware parameter have to be child of AbstractMiddleware"
         #     )
 
-        if call == 'before':
+        if call == "before":
             self.before_middleware.append(middleware)
-        elif call == 'after':
+        elif call == "after":
             self.after_middleware.append(middleware)
 
     async def _process_before_middlewares(self, request_data: RequestData):

@@ -20,10 +20,12 @@ users_router = DefaultRouter(
     prefix="/api/users",
 )
 
-_temp_memory: dict[str: UserModel] = dict()
+_temp_memory: dict[str:UserModel] = dict()
 
 
-@users_router.get("")  # You can set empty path to connect handler to prefix path (base router path)
+@users_router.get(
+    ""
+)  # You can set empty path to connect handler to prefix path (base router path)
 async def get_all_users(request_data: RequestData) -> ResponseData:
     response_scheme = DefaultScheme(  # Use DefaultScheme to set application response
         status=HTTP_200_OK, body=_temp_memory, headers=HEADERS
@@ -43,8 +45,10 @@ async def get_all_users(request_data: RequestData) -> ResponseData:
     user_data = _temp_memory.get(user_id)
 
     if user_data is not None:
-        response_scheme = DefaultScheme(  # Use DefaultScheme to set application response
-            status=HTTP_200_OK, body=user_data, headers=HEADERS
+        response_scheme = (
+            DefaultScheme(  # Use DefaultScheme to set application response
+                status=HTTP_200_OK, body=user_data, headers=HEADERS
+            )
         )
     else:
         response_scheme = DefaultScheme(
@@ -53,9 +57,7 @@ async def get_all_users(request_data: RequestData) -> ResponseData:
             body={"message": "Data not found"},
         )
 
-    response_data = ResponseData(
-        scheme=response_scheme
-    )
+    response_data = ResponseData(scheme=response_scheme)
 
     return response_data
 
@@ -74,11 +76,11 @@ async def add_new_user(scheme: UserModel, request_data: RequestData) -> Response
 
     _temp_memory[str(scheme.id)] = new_user_data
 
-    response_scheme = DefaultScheme(status=HTTP_200_OK, headers=HEADERS, body=new_user_data)
-
-    response_data = ResponseData(
-        scheme=response_scheme
+    response_scheme = DefaultScheme(
+        status=HTTP_200_OK, headers=HEADERS, body=new_user_data
     )
+
+    response_data = ResponseData(scheme=response_scheme)
 
     return response_data
 
@@ -95,9 +97,7 @@ async def delete_user(request_data: RequestData) -> ResponseData:
         headers=HEADERS,
     )
 
-    response_data = ResponseData(
-        scheme=response_scheme
-    )
+    response_data = ResponseData(scheme=response_scheme)
 
     return response_data
 
@@ -111,10 +111,10 @@ async def edit_user(scheme: UserModel, request_data: RequestData):
     if _temp_memory.get(user_id) is not None:
         _temp_memory[user_id] = new_user_data
 
-    response_scheme = DefaultScheme(status=HTTP_200_OK, headers=HEADERS, body=new_user_data)
-
-    response_data = ResponseData(
-        scheme=response_scheme
+    response_scheme = DefaultScheme(
+        status=HTTP_200_OK, headers=HEADERS, body=new_user_data
     )
+
+    response_data = ResponseData(scheme=response_scheme)
 
     return response_data

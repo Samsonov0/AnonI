@@ -38,9 +38,7 @@ async def say_hello_world(request_data: RequestData) -> ResponseData:
         status=HTTP_200_OK, body=data, headers=HEADERS
     )
 
-    response_data = ResponseData(
-        scheme=response_scheme
-    )
+    response_data = ResponseData(scheme=response_scheme)
 
     return response_data  # Just return DefaultScheme instance to return your response
 
@@ -61,8 +59,6 @@ async def say_hello_world_to_name(request_data: RequestData) -> ResponseData:
         status=HTTP_200_OK, body=data, headers=HEADERS
     )
 
-    response_data = ResponseData(
-        scheme=response_scheme
-    )
+    response_data = ResponseData(scheme=response_scheme)
 
     return response_data
