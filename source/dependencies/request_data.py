@@ -57,3 +57,6 @@ class RequestData:
 
     def query_parameters(self) -> dict[str:str]:
         return self._query_parameters
+
+    def receive(self):
+        return self._receive

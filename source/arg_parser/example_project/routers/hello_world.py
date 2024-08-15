@@ -1,7 +1,7 @@
 import json
 
 from source.arg_parser.example_project.settings import HEADERS
-from source.dependencies import RequestData
+from source.dependencies import RequestData, ResponseData
 from source.routers import DefaultRouter
 from source.schemes import DefaultScheme
 from source.utils.status_code import HTTP_200_OK
@@ -26,24 +26,27 @@ hello_world_router = DefaultRouter(
 
 
 @hello_world_router.get("/hello_world/")  # Use router.get("path") to create GET handler
-async def say_hello_world(request_data: RequestData) -> DefaultScheme:
+async def say_hello_world(request_data: RequestData) -> ResponseData:
     """
     Recommend to use types annotation for handlers arguments and return data.
     In some cases this is required condition to use handlers
     """
+
     data = json.dumps({"data": f"Hello World!"})
 
-    success = DefaultScheme(  # Use DefaultScheme to return application response
+    response_scheme = DefaultScheme(  # Use DefaultScheme to return application response
         status=HTTP_200_OK, body=data, headers=HEADERS
     )
 
-    return success  # Just return DefaultScheme instance to return your response
+    response_data = ResponseData(scheme=response_scheme)
+
+    return response_data  # Just return DefaultScheme instance to return your response
 
 
 @hello_world_router.get(
     "/hello_world/{name}"
 )  # Use {name} syntax to indicate expected data in url
-async def say_hello_world_to_name(request_data: RequestData) -> DefaultScheme:
+async def say_hello_world_to_name(request_data: RequestData) -> ResponseData:
     """
     Always set request_data: RequestData in your arguments, even you don't need use it right now.
     It's need to get url data and other request data
@@ -52,6 +55,10 @@ async def say_hello_world_to_name(request_data: RequestData) -> DefaultScheme:
 
     data = json.dumps({"data": f"Hello World! And hello {name}"})
 
-    success = DefaultScheme(status=HTTP_200_OK, body=data, headers=HEADERS)
+    response_scheme = DefaultScheme(  # Use DefaultScheme to return application response
+        status=HTTP_200_OK, body=data, headers=HEADERS
+    )
 
-    return success
+    response_data = ResponseData(scheme=response_scheme)
+
+    return response_data
