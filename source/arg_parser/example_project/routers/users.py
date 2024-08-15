@@ -103,7 +103,7 @@ async def delete_user(request_data: RequestData) -> ResponseData:
 
 
 @users_router.put("{user_id}")  # Use router.put("path") to create PUT handler
-async def edit_user(scheme: UserModel, request_data: RequestData):
+async def edit_user(scheme: UserModel, request_data: RequestData) -> ResponseData:
     user_id = request_data.path_parameters().get("user_id")
 
     new_user_data = scheme.dict()

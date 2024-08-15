@@ -57,7 +57,7 @@ class Anoni:
 
                 await self.send_response(send, response_data)
 
-    async def _process_response(self, request_data: RequestData, method, handler):
+    async def _process_response(self, request_data: RequestData, method: str, handler: Callable) -> ResponseData:
         request_data = await self._process_before_middlewares(request_data)
 
         if method in ("GET", "DELETE"):
@@ -145,7 +145,7 @@ class Anoni:
         elif call == "after":
             self.after_middleware.append(middleware)
 
-    async def _process_before_middlewares(self, request_data: RequestData):
+    async def _process_before_middlewares(self, request_data: RequestData) -> RequestData:
         for middleware in self.before_middleware:
             middleware_instance = middleware(
                 request_data=request_data,
@@ -154,7 +154,7 @@ class Anoni:
 
         return request_data
 
-    async def _process_after_middlewares(self, response_data: ResponseData):
+    async def _process_after_middlewares(self, response_data: ResponseData) -> ResponseData:
         for middleware in self.after_middleware:
             middleware_instance = middleware(
                 response_data=response_data,
