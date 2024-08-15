@@ -1,13 +1,13 @@
 import json
 import re
-from typing import Callable
+from typing import Callable, Type
 
 import uvicorn
 from pydantic import BaseModel
 
-from source.dependencies import RequestData
+from source.dependencies import RequestData, ResponseData
+from source.dependencies.middleware import AbstractMiddleware
 from source.routers import DefaultRouter
-from source.schemes import DefaultScheme
 from source.schemes.default import Headers, NotFound404
 from source.utils.fill_scheme import fill_scheme
 
@@ -19,7 +19,9 @@ class Anoni:
         self.port: str = port
         self.log_level: str = log_level
 
-        self.url_paths: dict[tuple[str:str] : Callable] = dict()
+        self.url_paths: dict[tuple[str:str]: Callable] = dict()
+        self.before_middleware: list[Type[AbstractMiddleware]] = []
+        self.after_middleware: list[Type[AbstractMiddleware]] = []
 
     async def __call__(self, scope: dict, receive: Callable, send: Callable):
         if scope["type"] == "http":
@@ -39,25 +41,43 @@ class Anoni:
                         scope=scope, receive=receive, path_regex=path_regex, path=path
                     )()
 
-                    if method in ("GET", "DELETE"):
-                        handler_response: DefaultScheme = await handler(
-                            request_data=request_data
-                        )
-                    elif method in ("POST", "PUT", "PATCH"):
-                        body: dict = await self._get_body(receive)
-                        filled_scheme: BaseModel = await fill_scheme(handler, body)
-                        handler_response: DefaultScheme = await handler(
-                            scheme=filled_scheme, request_data=request_data
-                        )
+                    response_data = await self._process_response(
+                        request_data=request_data,
+                        method=method,
+                        handler=handler
+                    )
 
-                    await self.send_response(send, handler_response)
+                    await self.send_response(send, response_data)
 
                     called: bool = True
                     break
 
             if not called:
                 page_not_fund = NotFound404()
-                await self.send_response(send, page_not_fund)
+
+                response_data = ResponseData(
+                    scheme=page_not_fund
+                )
+
+                await self.send_response(send, response_data)
+
+    async def _process_response(self, request_data: RequestData, method, handler):
+        request_data = await self._process_before_middlewares(request_data)
+
+        if method in ("GET", "DELETE"):
+            response_data: ResponseData = await handler(
+                request_data=request_data
+            )
+        elif method in ("POST", "PUT", "PATCH"):
+            body: dict = await self._get_body(request_data.receive())
+            filled_scheme: BaseModel = await fill_scheme(handler, body)
+            response_data: ResponseData = await handler(
+                scheme=filled_scheme, request_data=request_data
+            )
+
+        response_data = await self._process_after_middlewares(response_data=response_data)
+
+        return response_data
 
     async def _path_matched_with_path_regex(self, path_regex: str, path: str) -> bool:
         return re.match(path_regex, path) is not None
@@ -78,11 +98,13 @@ class Anoni:
         return body_data
 
     async def send_response(
-        self, send: Callable, response_scheme: DefaultScheme
+            self, send: Callable, response_data: ResponseData
     ) -> None:
-        status: int = response_scheme.status
-        headers: Headers = response_scheme.headers
-        body: str = response_scheme.body_to_json()
+        response = response_data.response()
+
+        status: int = response.status
+        headers: Headers = response.headers
+        body: str = response.body_to_json()
 
         if body is None:
             body: str = ""
@@ -113,3 +135,38 @@ class Anoni:
                 if key not in self.url_paths
             }
         )
+
+    async def register_middleware(self, call: str, middleware) -> None:
+        call: str = call.lower()
+
+        if call not in ('before', 'after'):
+            raise ValueError(
+                "Call parameter have to be 'after' or 'before' only"
+            )
+        # elif issubclass(middleware, AbstractMiddleware):
+        #     raise ValueError(
+        #         "Middleware parameter have to be child of AbstractMiddleware"
+        #     )
+
+        if call == 'before':
+            self.before_middleware.append(middleware)
+        elif call == 'after':
+            self.after_middleware.append(middleware)
+
+    async def _process_before_middlewares(self, request_data: RequestData):
+        for middleware in self.before_middleware:
+            middleware_instance = middleware(
+                request_data=request_data,
+            )
+            request_data = await middleware_instance()
+
+        return request_data
+
+    async def _process_after_middlewares(self, response_data: ResponseData):
+        for middleware in self.after_middleware:
+            middleware_instance = middleware(
+                response_data=response_data,
+            )
+            response_data = await middleware_instance()
+
+        return response_data
