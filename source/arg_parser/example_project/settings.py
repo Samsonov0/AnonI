@@ -2,15 +2,14 @@ import os
 
 from source.schemes.default import Headers
 
-"""
-This is an example of one of the ways to create app settings.
-You can use any convenient way
 
-(!) Recommend to use data structures for save application settings:
-• Data classes
-• Pydantic-config
-• etc
+"""
+Use this file to set project variables.
+
+(!) The set variables can be used in SETTINGS (from source.settings import SETTINGS)
 """
 
 HEADERS = Headers()
 CURRENT_DIRECTORY = os.getcwd()
+JWT_SECRET = "DEFAULT"
+JWT_ALGORITHM = "HS256"

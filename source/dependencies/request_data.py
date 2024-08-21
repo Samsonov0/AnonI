@@ -12,11 +12,32 @@ class RequestData:
         self._path_parameters: dict = dict()
         self._query_parameters: dict = dict()
 
+        self._headers: dict[str:str] = dict()
+
     async def __call__(self) -> "RequestData":
         await self._set_path_parameters()
         await self._set_query_parameters()
+        await self._set_headers()
 
         return self
+
+    async def _extract_headers(self) -> dict[str:str]:
+        byte_headers: list[tuple[bytes, bytes]] = self._scope.get("headers")
+
+        headers: dict[str:str] = dict()
+
+        for byte_header in byte_headers:
+            byte_name, byte_value = byte_header
+
+            name = byte_name.decode("utf-8")
+            value = byte_value.decode("utf-8")
+
+            headers[name] = value
+
+        return headers
+
+    async def _set_headers(self) -> None:
+        self._headers = await self._extract_headers()
 
     async def _parse_url(self) -> dict[str:str] | None:
         match: dict[str:str] = re.match(self._path_regex, self._path)
@@ -58,5 +79,8 @@ class RequestData:
     def query_parameters(self) -> dict[str:str]:
         return self._query_parameters
 
-    def receive(self):
+    def receive(self) -> Callable:
         return self._receive
+
+    def headers(self) -> dict[str:str]:
+        return self._headers
