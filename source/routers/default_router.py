@@ -9,6 +9,9 @@ class DefaultRouter:
         self._paths: dict[tuple[str, str] : Callable] = dict()
         self._prefix: str = prefix
 
+    def __len__(self):
+        return 1
+
     def _path_to_regex(self, path: str) -> str:
         path_regex: str = re.sub(r"{(\w+)}", r"(?P<\1>[^/]+)", path)
         path_regex: str = f"^{path_regex}$"
