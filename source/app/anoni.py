@@ -5,8 +5,10 @@ from typing import Callable, Type
 import uvicorn
 from pydantic import BaseModel
 
+from source.arg_parser.example_project.settings import HEADERS
 from source.dependencies import RequestData, ResponseData
-from source.dependencies.middleware import AbstractMiddleware
+from source.dependencies.exceptions import HTTPException
+from source.dependencies.middlewares.default import AbstractMiddleware
 from source.routers import DefaultRouter
 from source.schemes.default import Headers, NotFound404
 from source.utils.fill_scheme import fill_scheme
@@ -19,7 +21,7 @@ class Anoni:
         self.port: str = port
         self.log_level: str = log_level
 
-        self.url_paths: dict[tuple[str:str]: Callable] = dict()
+        self.url_paths: dict[tuple[str: str]: Callable] = dict()
         self.before_middleware: list[Type[AbstractMiddleware]] = []
         self.after_middleware: list[Type[AbstractMiddleware]] = []
 
@@ -31,23 +33,32 @@ class Anoni:
             method: str = scope["method"]
 
             for path_data, handler in self.url_paths.items():
-
                 path_regex, excepted_method = path_data
 
                 match: bool = await self._path_matched_with_path_regex(path_regex, path)
 
-                if match and method == excepted_method:
-                    request_data: RequestData = await RequestData(
-                        scope=scope, receive=receive, path_regex=path_regex, path=path
-                    )()
+                try:
+                    if match and method == excepted_method:
+                        request_data: RequestData = await RequestData(
+                            scope=scope,
+                            receive=receive,
+                            path_regex=path_regex,
+                            path=path,
+                        )()
 
-                    response_data = await self._process_response(
-                        request_data=request_data, method=method, handler=handler
-                    )
+                        response_data = await self._process_response(
+                            request_data=request_data, method=method, handler=handler
+                        )
 
-                    await self.send_response(send, response_data)
+                        await self.send_response(send, response_data)
 
-                    called: bool = True
+                        called = True
+                        break
+
+                except HTTPException as e:
+                    await self.send_exception(send=send, exception=e)
+
+                    called = True
                     break
 
             if not called:
@@ -57,7 +68,9 @@ class Anoni:
 
                 await self.send_response(send, response_data)
 
-    async def _process_response(self, request_data: RequestData, method: str, handler: Callable) -> ResponseData:
+    async def _process_response(
+        self, request_data: RequestData, method: str, handler: Callable
+    ) -> ResponseData:
         request_data = await self._process_before_middlewares(request_data)
 
         if method in ("GET", "DELETE"):
@@ -93,6 +106,22 @@ class Anoni:
 
         return body_data
 
+    async def send_exception(self, send: Callable, exception: HTTPException):
+        await send(
+            {
+                "type": "http.response.start",
+                "status": exception.status,
+                "headers": HEADERS.to_tuple_list(),
+            }
+        )
+
+        await send(
+            {
+                "type": "http.response.body",
+                "body": exception.get_exception(),
+            }
+        )
+
     async def send_response(self, send: Callable, response_data: ResponseData) -> None:
         response = response_data.response()
 
@@ -121,14 +150,17 @@ class Anoni:
     def start_app(self) -> None:
         uvicorn.run(self)  # Пробросить порт хост и лог_левел
 
-    async def register_router(self, router: DefaultRouter) -> None:
-        self.url_paths.update(
-            {
-                key: value
-                for key, value in router.paths().items()
-                if key not in self.url_paths
-            }
-        )
+    async def register_router(
+        self, router: DefaultRouter | tuple[DefaultRouter, ...]
+    ) -> None:
+        for count in range(len(router)):
+            self.url_paths.update(
+                {
+                    key: value
+                    for key, value in router.paths().items()
+                    if key not in self.url_paths
+                }
+            )
 
     async def register_middleware(self, call: str, middleware) -> None:
         call: str = call.lower()
@@ -145,7 +177,9 @@ class Anoni:
         elif call == "after":
             self.after_middleware.append(middleware)
 
-    async def _process_before_middlewares(self, request_data: RequestData) -> RequestData:
+    async def _process_before_middlewares(
+        self, request_data: RequestData
+    ) -> RequestData:
         for middleware in self.before_middleware:
             middleware_instance = middleware(
                 request_data=request_data,
@@ -154,7 +188,9 @@ class Anoni:
 
         return request_data
 
-    async def _process_after_middlewares(self, response_data: ResponseData) -> ResponseData:
+    async def _process_after_middlewares(
+        self, response_data: ResponseData
+    ) -> ResponseData:
         for middleware in self.after_middleware:
             middleware_instance = middleware(
                 response_data=response_data,
