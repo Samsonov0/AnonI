@@ -1,6 +1,6 @@
 import json
 import re
-from typing import Callable, Type
+from typing import Callable, Optional, Type
 
 import uvicorn
 from pydantic import BaseModel
@@ -11,6 +11,7 @@ from source.dependencies.exceptions import HTTPException
 from source.dependencies.middlewares.default import AbstractMiddleware
 from source.routers import DefaultRouter
 from source.schemes.default import Headers, NotFound404
+from source.schemes.extra import ExtraPathSettings
 from source.utils.fill_scheme import fill_scheme
 
 
@@ -21,7 +22,7 @@ class Anoni:
         self.port: str = port
         self.log_level: str = log_level
 
-        self.url_paths: dict[tuple[str: str]: Callable] = dict()
+        self.url_paths: dict[tuple[str:str]: Callable] = dict()
         self.before_middleware: list[Type[AbstractMiddleware]] = []
         self.after_middleware: list[Type[AbstractMiddleware]] = []
 
@@ -33,7 +34,7 @@ class Anoni:
             method: str = scope["method"]
 
             for path_data, handler in self.url_paths.items():
-                path_regex, excepted_method = path_data
+                path_regex, excepted_method, extra = path_data
 
                 match: bool = await self._path_matched_with_path_regex(path_regex, path)
 
@@ -47,7 +48,10 @@ class Anoni:
                         )()
 
                         response_data = await self._process_response(
-                            request_data=request_data, method=method, handler=handler
+                            request_data=request_data,
+                            method=method,
+                            handler=handler,
+                            extra=extra,
                         )
 
                         await self.send_response(send, response_data)
@@ -69,9 +73,15 @@ class Anoni:
                 await self.send_response(send, response_data)
 
     async def _process_response(
-        self, request_data: RequestData, method: str, handler: Callable
+        self,
+        request_data: RequestData,
+        method: str,
+        handler: Callable,
+        extra: Optional[ExtraPathSettings] = None,
     ) -> ResponseData:
-        request_data = await self._process_before_middlewares(request_data)
+        request_data = await self._process_before_middlewares(
+            request_data=request_data, extra=extra
+        )
 
         if method in ("GET", "DELETE"):
             response_data: ResponseData = await handler(request_data=request_data)
@@ -83,7 +93,7 @@ class Anoni:
             )
 
         response_data = await self._process_after_middlewares(
-            response_data=response_data
+            response_data=response_data, extra=extra
         )
 
         return response_data
@@ -178,23 +188,37 @@ class Anoni:
             self.after_middleware.append(middleware)
 
     async def _process_before_middlewares(
-        self, request_data: RequestData
+        self, request_data: RequestData, extra: Optional[ExtraPathSettings] = None
     ) -> RequestData:
-        for middleware in self.before_middleware:
-            middleware_instance = middleware(
-                request_data=request_data,
-            )
-            request_data = await middleware_instance()
+        exclude_middlewares = ()
+
+        if extra is not None:
+            exclude_middlewares = extra.exclude_middlewares
+
+        if "__all__" not in exclude_middlewares:
+            for middleware in self.before_middleware:
+                if middleware.__name__ not in exclude_middlewares:
+                    middleware_instance = middleware(
+                        request_data=request_data,
+                    )
+                    request_data = await middleware_instance()
 
         return request_data
 
     async def _process_after_middlewares(
-        self, response_data: ResponseData
+        self, response_data: ResponseData, extra: Optional[ExtraPathSettings] = None
     ) -> ResponseData:
-        for middleware in self.after_middleware:
-            middleware_instance = middleware(
-                response_data=response_data,
-            )
-            response_data = await middleware_instance()
+        exclude_middlewares = ()
+
+        if extra is not None:
+            exclude_middlewares = extra.exclude_middlewares
+
+        if "__all__" not in exclude_middlewares:
+            for middleware in self.after_middleware:
+                if middleware.__name__ not in exclude_middlewares:
+                    middleware_instance = middleware(
+                        response_data=response_data,
+                    )
+                    response_data = await middleware_instance()
 
         return response_data
