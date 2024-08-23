@@ -25,12 +25,8 @@ class HTTPForbidden(HTTPException):
 
 
 class HTTPSuccess(HTTPException):
-    def __init__(
-        self, message_type: str = "message", message: str = "Success"
-    ) -> None:
-        super().__init__(
-            status=HTTP_200_OK, message_type=message_type, message=message
-        )
+    def __init__(self, message_type: str = "message", message: str = "Success") -> None:
+        super().__init__(status=HTTP_200_OK, message_type=message_type, message=message)
 
 
 class HTTPNotFound(HTTPException):
@@ -49,5 +45,3 @@ class HTTPBadRequest(HTTPException):
         super().__init__(
             status=HTTP_400_BAD_REQUEST, message_type=message_type, message=message
         )
-
-

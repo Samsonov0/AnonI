@@ -2,7 +2,6 @@ import os
 
 from source.schemes.default import Headers
 
-
 """
 Use this file to set project variables.
 
