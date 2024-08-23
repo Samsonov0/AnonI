@@ -5,7 +5,13 @@ from source.schemes.extra import ExtraPathSettings
 
 
 class DefaultRouter:
-    def __init__(self, name: str, description: str, prefix: str = "", extra: ExtraPathSettings | None = None):
+    def __init__(
+        self,
+        name: str,
+        description: str,
+        prefix: str = "",
+        extra: ExtraPathSettings | None = None,
+    ):
         self._name: str = name
         self._description: str = description
         self._paths: dict[tuple[str, str] : Callable] = dict()
@@ -38,7 +44,11 @@ class DefaultRouter:
 
             correct_path: str = self._modernize_path(path)
 
-            key: tuple[str, str, ExtraPathSettings] = (correct_path, "GET", extra_settings)
+            key: tuple[str, str, ExtraPathSettings] = (
+                correct_path,
+                "GET",
+                extra_settings,
+            )
 
             self._paths[key] = func
 
@@ -50,7 +60,11 @@ class DefaultRouter:
 
             correct_path: str = self._modernize_path(path)
 
-            key: tuple[str, str, ExtraPathSettings] = (correct_path, "POST", extra_settings)
+            key: tuple[str, str, ExtraPathSettings] = (
+                correct_path,
+                "POST",
+                extra_settings,
+            )
 
             self._paths[key] = func
 
@@ -62,7 +76,11 @@ class DefaultRouter:
 
             correct_path: str = self._modernize_path(path)
 
-            key: tuple[str, str, ExtraPathSettings] = (correct_path, "PUT", extra_settings)
+            key: tuple[str, str, ExtraPathSettings] = (
+                correct_path,
+                "PUT",
+                extra_settings,
+            )
 
             self._paths[key] = func
 
@@ -74,7 +92,11 @@ class DefaultRouter:
 
             correct_path: str = self._modernize_path(path)
 
-            key: tuple[str, str, ExtraPathSettings] = (correct_path, "PATCH", extra_settings)
+            key: tuple[str, str, ExtraPathSettings] = (
+                correct_path,
+                "PATCH",
+                extra_settings,
+            )
 
             self._paths[key] = func
 
@@ -86,7 +108,11 @@ class DefaultRouter:
 
             correct_path: str = self._modernize_path(path)
 
-            key: tuple[str, str, ExtraPathSettings] = (correct_path, "DELETE", extra_settings)
+            key: tuple[str, str, ExtraPathSettings] = (
+                correct_path,
+                "DELETE",
+                extra_settings,
+            )
 
             self._paths[key] = func
 
