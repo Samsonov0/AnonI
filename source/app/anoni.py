@@ -12,6 +12,7 @@ from source.dependencies.middlewares.default import AbstractMiddleware
 from source.routers import DefaultRouter
 from source.schemes.default import Headers, NotFound404
 from source.schemes.extra import ExtraPathSettings
+from source.utils import HTTP_DELETE, HTTP_GET, HTTP_PATCH, HTTP_POST, HTTP_PUT
 from source.utils.fill_scheme import fill_scheme
 
 
@@ -36,7 +37,7 @@ class Anoni:
             for path_data, handler in self.url_paths.items():
                 path_regex, excepted_method, extra = path_data
 
-                match: bool = await self._path_matched_with_path_regex(path_regex, path)
+                match: bool = re.match(path_regex, path) is not None
 
                 try:
                     if match and method == excepted_method:
@@ -54,13 +55,13 @@ class Anoni:
                             extra=extra,
                         )
 
-                        await self.send_response(send, response_data)
+                        await self._send_response(send, response_data)
 
                         called = True
                         break
 
                 except HTTPException as e:
-                    await self.send_exception(send=send, exception=e)
+                    await self._send_exception(send=send, exception=e)
 
                     called = True
                     break
@@ -70,7 +71,7 @@ class Anoni:
 
                 response_data = ResponseData(scheme=page_not_fund)
 
-                await self.send_response(send, response_data)
+                await self._send_response(send, response_data)
 
     async def _process_response(
         self,
@@ -82,24 +83,58 @@ class Anoni:
         request_data = await self._process_before_middlewares(
             request_data=request_data, extra=extra
         )
+        response_data = await self._call_handler(
+            request_data=request_data, method=method, handler=handler
+        )
+        response_data = await self._process_after_middlewares(
+            response_data=response_data, extra=extra
+        )
+        return response_data
 
-        if method in ("GET", "DELETE"):
+    async def _send_exception(self, send: Callable, exception: HTTPException) -> None:
+        await self._send_server_response(
+            send=send,
+            status=exception.status,
+            headers=HEADERS.to_tuple_list(),
+            body=exception.get_exception(),
+        )
+
+    async def _send_response(self, send: Callable, response_data: ResponseData) -> None:
+        response = response_data.response()
+
+        status: int = response.status
+        headers: Headers = response.headers
+        body: str = response.body_to_json()
+
+        if body is None:
+            body: str = ""
+
+        await self._send_server_response(
+            send=send,
+            status=status,
+            headers=headers.to_tuple_list(),
+            body=body.encode("utf-8"),
+        )
+
+    def start_app(self) -> None:
+        uvicorn.run(self)  # Пробросить порт хост и лог_левел
+
+    async def _call_handler(
+        self,
+        request_data: RequestData,
+        method: str,
+        handler: Callable,
+    ) -> ResponseData:
+        if method in (HTTP_GET, HTTP_DELETE):
             response_data: ResponseData = await handler(request_data=request_data)
-        elif method in ("POST", "PUT", "PATCH"):
+        elif method in (HTTP_POST, HTTP_PUT, HTTP_PATCH):
             body: dict = await self._get_body(request_data.receive())
             filled_scheme: BaseModel = await fill_scheme(handler, body)
             response_data: ResponseData = await handler(
                 scheme=filled_scheme, request_data=request_data
             )
 
-        response_data = await self._process_after_middlewares(
-            response_data=response_data, extra=extra
-        )
-
         return response_data
-
-    async def _path_matched_with_path_regex(self, path_regex: str, path: str) -> bool:
-        return re.match(path_regex, path) is not None
 
     async def _get_body(self, receive) -> dict:
         body: bytes = b""
@@ -116,49 +151,23 @@ class Anoni:
 
         return body_data
 
-    async def send_exception(self, send: Callable, exception: HTTPException):
-        await send(
-            {
-                "type": "http.response.start",
-                "status": exception.status,
-                "headers": HEADERS.to_tuple_list(),
-            }
-        )
-
-        await send(
-            {
-                "type": "http.response.body",
-                "body": exception.get_exception(),
-            }
-        )
-
-    async def send_response(self, send: Callable, response_data: ResponseData) -> None:
-        response = response_data.response()
-
-        status: int = response.status
-        headers: Headers = response.headers
-        body: str = response.body_to_json()
-
-        if body is None:
-            body: str = ""
-
+    async def _send_server_response(
+        self, send: Callable, status: int, headers: list, body: bytes
+    ) -> None:
         await send(
             {
                 "type": "http.response.start",
                 "status": status,
-                "headers": headers.to_tuple_list(),
+                "headers": headers,
             }
         )
 
         await send(
             {
                 "type": "http.response.body",
-                "body": body.encode("utf-8"),
+                "body": body,
             }
         )
-
-    def start_app(self) -> None:
-        uvicorn.run(self)  # Пробросить порт хост и лог_левел
 
     async def register_router(
         self, router: DefaultRouter | tuple[DefaultRouter, ...]
